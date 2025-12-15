@@ -6,6 +6,33 @@ import { useCart } from "../store/cart";
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
 
+/* ------------------ COUNTRY & STATE DATA ------------------ */
+const COUNTRIES = [
+  { code: "US", name: "United States" },
+  { code: "IN", name: "India" },
+] as const;
+
+const US_STATES = [
+  "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut","Delaware",
+  "Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa","Kansas","Kentucky",
+  "Louisiana","Maine","Maryland","Massachusetts","Michigan","Minnesota","Mississippi",
+  "Missouri","Montana","Nebraska","Nevada","New Hampshire","New Jersey","New Mexico",
+  "New York","North Carolina","North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania",
+  "Rhode Island","South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont",
+  "Virginia","Washington","West Virginia","Wisconsin","Wyoming",
+];
+
+const INDIA_STATES_UT = [
+  "Andhra Pradesh","Arunachal Pradesh","Assam","Bihar","Chhattisgarh","Goa","Gujarat",
+  "Haryana","Himachal Pradesh","Jharkhand","Karnataka","Kerala","Madhya Pradesh",
+  "Maharashtra","Manipur","Meghalaya","Mizoram","Nagaland","Odisha","Punjab","Rajasthan",
+  "Sikkim","Tamil Nadu","Telangana","Tripura","Uttar Pradesh","Uttarakhand","West Bengal",
+  "Andaman and Nicobar Islands","Chandigarh","Dadra and Nagar Haveli and Daman and Diu",
+  "Delhi","Jammu and Kashmir","Ladakh","Lakshadweep","Puducherry",
+];
+
+type CountryCode = (typeof COUNTRIES)[number]["code"];
+
 export default function CheckoutPage() {
   const router = useRouter();
 
@@ -14,7 +41,7 @@ export default function CheckoutPage() {
 
   const [loading, setLoading] = useState(false);
 
-  // simple shipping/tax (you can change later)
+  /* ------------------ PRICE CALCULATION ------------------ */
   const subtotal = useMemo(
     () => items.reduce((sum, i) => sum + i.price * i.qty, 0),
     [items]
@@ -23,26 +50,34 @@ export default function CheckoutPage() {
   const tax = items.length ? +(subtotal * 0.06).toFixed(2) : 0;
   const total = +(subtotal + shipping + tax).toFixed(2);
 
-  // form state (simple for now)
+  /* ------------------ SHIPPING FORM STATE ------------------ */
   const [fullName, setFullName] = useState("");
   const [address, setAddress] = useState("");
   const [city, setCity] = useState("");
+  const [country, setCountry] = useState<CountryCode>("US");
+  const [state, setState] = useState("");
   const [zip, setZip] = useState("");
+
   const [payment, setPayment] = useState<"card" | "cod">("card");
+
+  const stateOptions = country === "US" ? US_STATES : INDIA_STATES_UT;
 
   const canPlace =
     items.length > 0 &&
     fullName.trim().length >= 2 &&
     address.trim().length >= 5 &&
     city.trim().length >= 2 &&
-    zip.trim().length >= 4;
+    state.trim().length >= 2 &&
+    zip.trim().length >= (country === "US" ? 5 : 6);
 
+  /* ------------------ COD PLACE ORDER ------------------ */
   function placeOrder() {
     if (!items.length) {
       toast.error("Your cart is empty");
       router.push("/cart");
       return;
     }
+
     if (!canPlace) {
       toast.error("Please complete shipping details");
       return;
@@ -54,6 +89,47 @@ export default function CheckoutPage() {
       toast.success("Order placed ✅");
       router.push("/order-success");
     }, 900);
+  }
+
+  /* ------------------ STRIPE CHECKOUT REDIRECT ------------------ */
+  async function payWithStripe() {
+    if (!items.length) {
+      toast.error("Your cart is empty");
+      router.push("/cart");
+      return;
+    }
+
+    if (!canPlace) {
+      toast.error("Please complete shipping details");
+      return;
+    }
+
+    if (loading) return;
+    setLoading(true);
+
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ items }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to start Stripe checkout");
+      }
+
+      if (!data?.url) {
+        throw new Error("Missing Stripe Checkout URL");
+      }
+
+      // Redirect to Stripe hosted Checkout
+      window.location.href = data.url;
+    } catch (err: any) {
+      toast.error(err?.message || "Payment failed");
+      setLoading(false);
+    }
   }
 
   return (
@@ -144,15 +220,60 @@ export default function CheckoutPage() {
 
                 <div>
                   <label className="text-sm font-semibold text-gray-800">
-                    ZIP
+                    Country
+                  </label>
+                  <select
+                    value={country}
+                    onChange={(e) => {
+                      const next = e.target.value as CountryCode;
+                      setCountry(next);
+                      setState("");
+                      setZip("");
+                    }}
+                    className="mt-1 w-full rounded-lg border px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  >
+                    {COUNTRIES.map((c) => (
+                      <option key={c.code} value={c.code}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold text-gray-800">
+                    State
+                  </label>
+                  <select
+                    value={state}
+                    onChange={(e) => setState(e.target.value)}
+                    className="mt-1 w-full rounded-lg border px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-yellow-400"
+                  >
+                    <option value="">Select state</option>
+                    {stateOptions.map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="text-sm font-semibold text-gray-800">
+                    {country === "US" ? "ZIP code" : "PIN code"}
                   </label>
                   <input
                     value={zip}
                     onChange={(e) => setZip(e.target.value)}
                     autoComplete="postal-code"
-                    placeholder="60601"
+                    placeholder={country === "US" ? "60601" : "500001"}
                     className="mt-1 w-full rounded-lg border px-3 py-2 focus:outline-none focus:ring-2 focus:ring-yellow-400"
                   />
+                  <p className="mt-1 text-xs text-gray-500">
+                    {country === "US"
+                      ? "ZIP should be at least 5 characters."
+                      : "PIN should be at least 6 characters."}
+                  </p>
                 </div>
               </div>
 
@@ -175,9 +296,9 @@ export default function CheckoutPage() {
                     onChange={() => setPayment("card")}
                   />
                   <div className="flex-1">
-                    <div className="font-semibold">Card (demo)</div>
+                    <div className="font-semibold">Card (Stripe)</div>
                     <div className="text-xs text-gray-600">
-                      We’ll add real Stripe payments next.
+                      You’ll be redirected to Stripe Checkout.
                     </div>
                   </div>
                 </label>
@@ -190,15 +311,13 @@ export default function CheckoutPage() {
                   />
                   <div className="flex-1">
                     <div className="font-semibold">Cash on delivery</div>
-                    <div className="text-xs text-gray-600">
-                      Pay when it arrives.
-                    </div>
+                    <div className="text-xs text-gray-600">Pay when it arrives.</div>
                   </div>
                 </label>
               </div>
             </div>
 
-            {/* Review */}
+            {/* Review items */}
             <div className="rounded-xl border bg-white p-5 shadow-sm">
               <h2 className="text-lg font-bold text-gray-900 mb-4">
                 3. Review items
@@ -224,9 +343,7 @@ export default function CheckoutPage() {
                         <div className="font-semibold text-gray-900 line-clamp-1">
                           {x.title}
                         </div>
-                        <div className="text-sm text-gray-600">
-                          Qty: {x.qty}
-                        </div>
+                        <div className="text-sm text-gray-600">Qty: {x.qty}</div>
                       </div>
                       <div className="font-semibold">
                         ${(x.price * x.qty).toFixed(2)}
@@ -268,7 +385,7 @@ export default function CheckoutPage() {
               </div>
 
               <button
-                onClick={placeOrder}
+                onClick={payment === "card" ? payWithStripe : placeOrder}
                 disabled={!canPlace || loading}
                 className={`mt-4 w-full rounded-lg py-3 font-semibold transition ${
                   !canPlace || loading
@@ -276,11 +393,15 @@ export default function CheckoutPage() {
                     : "bg-yellow-400 hover:bg-yellow-500"
                 }`}
               >
-                {loading ? "Placing order..." : "Place your order"}
+                {loading
+                  ? "Redirecting..."
+                  : payment === "card"
+                  ? "Pay with Stripe"
+                  : "Place your order"}
               </button>
 
               <p className="mt-3 text-xs text-gray-500">
-                Amazon-style checkouts keep a visible summary and a clear CTA. 
+                Payment is processed securely via Stripe Checkout (test mode).
               </p>
             </div>
           </aside>
