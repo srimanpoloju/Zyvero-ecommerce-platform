@@ -62,13 +62,15 @@ export default function CheckoutPage() {
 
   const stateOptions = country === "US" ? US_STATES : INDIA_STATES_UT;
 
+  const zipMin = country === "US" ? 5 : 6;
+
   const canPlace =
     items.length > 0 &&
     fullName.trim().length >= 2 &&
     address.trim().length >= 5 &&
     city.trim().length >= 2 &&
     state.trim().length >= 2 &&
-    zip.trim().length >= (country === "US" ? 5 : 6);
+    zip.trim().length >= zipMin;
 
   /* ------------------ COD PLACE ORDER ------------------ */
   function placeOrder() {
@@ -93,6 +95,9 @@ export default function CheckoutPage() {
 
   /* ------------------ STRIPE CHECKOUT REDIRECT ------------------ */
   async function payWithStripe() {
+    // ✅ Confirm click works
+    toast("Stripe button clicked ✅");
+
     if (!items.length) {
       toast.error("Your cart is empty");
       router.push("/cart");
@@ -114,17 +119,17 @@ export default function CheckoutPage() {
         body: JSON.stringify({ items }),
       });
 
-      const data = await res.json();
+      const data = await res.json().catch(() => ({} as any));
 
       if (!res.ok) {
-        throw new Error(data?.error || "Failed to start Stripe checkout");
+        throw new Error(data?.error || "Stripe checkout failed");
       }
 
       if (!data?.url) {
         throw new Error("Missing Stripe Checkout URL");
       }
 
-      // Redirect to Stripe hosted Checkout
+      // Redirect to Stripe hosted Checkout page
       window.location.href = data.url;
     } catch (err: any) {
       toast.error(err?.message || "Payment failed");
@@ -134,7 +139,7 @@ export default function CheckoutPage() {
 
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* Top bar like a real checkout */}
+      {/* Top bar */}
       <div className="border-b bg-white">
         <div className="mx-auto max-w-6xl px-4 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
@@ -163,9 +168,8 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        {/* Two-column layout (left form, right sticky summary) */}
         <div className="grid gap-6 lg:grid-cols-3">
-          {/* LEFT: Forms */}
+          {/* LEFT */}
           <section className="lg:col-span-2 space-y-5">
             {/* Shipping */}
             <div className="rounded-xl border bg-white p-5 shadow-sm">
@@ -276,10 +280,6 @@ export default function CheckoutPage() {
                   </p>
                 </div>
               </div>
-
-              <p className="mt-3 text-xs text-gray-500">
-                Tip: Keep fields minimal — fewer inputs = faster checkout.
-              </p>
             </div>
 
             {/* Payment */}
@@ -316,46 +316,9 @@ export default function CheckoutPage() {
                 </label>
               </div>
             </div>
-
-            {/* Review items */}
-            <div className="rounded-xl border bg-white p-5 shadow-sm">
-              <h2 className="text-lg font-bold text-gray-900 mb-4">
-                3. Review items
-              </h2>
-
-              {items.length === 0 ? (
-                <div className="text-sm text-gray-600">
-                  Your cart is empty.{" "}
-                  <Link href="/" className="text-blue-700 hover:underline">
-                    Continue shopping
-                  </Link>
-                </div>
-              ) : (
-                <div className="divide-y">
-                  {items.map((x) => (
-                    <div key={x.id} className="py-3 flex gap-3">
-                      <img
-                        src={x.thumbnail}
-                        alt={x.title}
-                        className="h-14 w-14 object-contain rounded bg-white border"
-                      />
-                      <div className="flex-1">
-                        <div className="font-semibold text-gray-900 line-clamp-1">
-                          {x.title}
-                        </div>
-                        <div className="text-sm text-gray-600">Qty: {x.qty}</div>
-                      </div>
-                      <div className="font-semibold">
-                        ${(x.price * x.qty).toFixed(2)}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
           </section>
 
-          {/* RIGHT: Sticky order summary */}
+          {/* RIGHT */}
           <aside className="lg:col-span-1">
             <div className="lg:sticky lg:top-6 rounded-xl border bg-white p-5 shadow-sm">
               <h3 className="text-lg font-bold text-gray-900">Order summary</h3>
@@ -401,7 +364,8 @@ export default function CheckoutPage() {
               </button>
 
               <p className="mt-3 text-xs text-gray-500">
-                Payment is processed securely via Stripe Checkout (test mode).
+                If Stripe is not opening, check Vercel Environment Variables
+                (STRIPE_SECRET_KEY).
               </p>
             </div>
           </aside>
