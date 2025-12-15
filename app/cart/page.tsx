@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import Link from "next/link";
 import { useCart } from "../store/cart";
 
 export default function CartPage() {
@@ -10,30 +10,33 @@ export default function CartPage() {
   const removeItem = useCart((s) => s.removeItem);
   const clear = useCart((s) => s.clear);
 
-  // Load persisted cart on first mount
-  useEffect(() => {
-    // Trigger store init by adding no-op set: store already reads from storage on add.
-    // We'll just ensure UI updates if user refreshes cart page.
-    // (Simple approach) If empty but storage has items, re-add via direct reload:
-    // We'll keep it minimal: user will see items after adding; and storage persists across refreshes.
-  }, []);
-
   const total = items.reduce((sum, x) => sum + x.price * x.qty, 0);
 
   return (
     <main className="min-h-screen bg-gray-100 p-6">
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold text-gray-800">Your Cart</h2>
-        <button
-          onClick={clear}
-          className="text-sm bg-gray-900 text-white px-3 py-2 rounded"
-        >
-          Clear cart
-        </button>
+
+        {items.length > 0 && (
+          <button
+            onClick={clear}
+            className="text-sm bg-gray-900 text-white px-3 py-2 rounded"
+          >
+            Clear cart
+          </button>
+        )}
       </div>
 
       {items.length === 0 ? (
-        <p className="mt-6 text-gray-700">Cart is empty. Add some products.</p>
+        <div className="mt-6">
+          <p className="text-gray-700">Cart is empty. Add some products.</p>
+          <Link
+            href="/"
+            className="inline-block mt-4 text-sm text-blue-700 hover:underline"
+          >
+            ← Continue shopping
+          </Link>
+        </div>
       ) : (
         <div className="mt-6 space-y-4">
           {items.map((x) => (
@@ -67,6 +70,9 @@ export default function CartPage() {
                   +
                 </button>
               </div>
+              <p className="mt-3 text-sm text-gray-500 text-center">
+                ✅ Free shipping on orders over $100
+              </p>
 
               <button
                 onClick={() => removeItem(x.id)}
@@ -77,8 +83,18 @@ export default function CartPage() {
             </div>
           ))}
 
-          <div className="text-right text-xl font-bold">
-            Total: ${total.toFixed(2)}
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="flex items-center justify-between text-lg font-bold">
+              <span>Total</span>
+              <span>${total.toFixed(2)}</span>
+            </div>
+
+            <Link
+              href="/checkout"
+              className="mt-4 block text-center bg-yellow-400 hover:bg-yellow-500 py-3 rounded font-semibold"
+            >
+              Proceed to Checkout
+            </Link>
           </div>
         </div>
       )}
