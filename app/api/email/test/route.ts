@@ -10,15 +10,12 @@ export async function POST(req: Request) {
 
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${key}`,
-      "Content-Type": "application/json",
-    },
+    headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       from,
       to,
-      subject: "Zyvero test email ✅",
-      html: "<p>If you got this, email sending works.</p>",
+      subject: "Zyvero local test email ✅",
+      html: "<p>If you got this, Resend is working locally.</p>",
     }),
   });
 

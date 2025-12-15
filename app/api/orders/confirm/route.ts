@@ -4,12 +4,13 @@ import { supabaseAdmin } from "@/lib/supabaseAdmin";
 export const runtime = "nodejs";
 
 async function sendEmailReceipt(to: string, subject: string, html: string) {
-  // If you didn’t set RESEND_API_KEY, we just skip custom email.
   const key = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM || "Zyvero <onboarding@resend.dev>";
-  if (!key) return { skipped: true };
 
-  // Minimal fetch call to Resend API (no extra dependency needed)
+  // 🚨 Do not silently skip. Throw clear errors.
+  if (!key) throw new Error("Missing RESEND_API_KEY in environment variables");
+  if (!to) throw new Error("Missing customer email (Stripe session has no email)");
+
   const res = await fetch("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -19,12 +20,13 @@ async function sendEmailReceipt(to: string, subject: string, html: string) {
     body: JSON.stringify({ from, to, subject, html }),
   });
 
+  const text = await res.text();
+
   if (!res.ok) {
-    const t = await res.text();
-    throw new Error(`Resend failed: ${t}`);
+    throw new Error(`Resend failed (${res.status}): ${text}`);
   }
 
-  return { sent: true };
+  return { ok: true, response: text };
 }
 
 export async function POST(req: Request) {
@@ -67,6 +69,8 @@ export async function POST(req: Request) {
       .eq("stripe_session_id", session.id)
       .maybeSingle();
 
+    let dbInserted = false;
+
     if (!existing) {
       const { error: insertErr } = await admin.from("orders").insert({
         stripe_session_id: session.id,
@@ -78,16 +82,18 @@ export async function POST(req: Request) {
       });
 
       if (insertErr) throw insertErr;
+      dbInserted = true;
     }
 
-    // ✅ Custom email receipt (optional)
-    // Stripe also can email receipts automatically from Stripe Dashboard.
+    // ✅ Email receipt (now returns status)
+    let emailResult: any = { skipped: true };
+
     if (email) {
       const total =
         session.amount_total != null ? (session.amount_total / 100).toFixed(2) : "—";
       const cur = (session.currency || "usd").toUpperCase();
 
-      await sendEmailReceipt(
+      emailResult = await sendEmailReceipt(
         email,
         "Your Zyvero order receipt ✅",
         `
@@ -99,19 +105,27 @@ export async function POST(req: Request) {
             <h3>Items</h3>
             <ul>
               ${lineItems
-                .map(
-                  (i) =>
-                    `<li>${i.description} — Qty: ${i.quantity ?? 1}</li>`
-                )
+                .map((i) => `<li>${i.description} — Qty: ${i.quantity ?? 1}</li>`)
                 .join("")}
             </ul>
             <p>— Zyvero</p>
           </div>
         `
       );
+    } else {
+      emailResult = { skipped: true, reason: "Stripe session email is null" };
     }
 
-    return Response.json({ ok: true }, { status: 200 });
+    return Response.json(
+      {
+        ok: true,
+        stripe_session_id: session.id,
+        user_email: email,
+        dbInserted,
+        emailResult,
+      },
+      { status: 200 }
+    );
   } catch (e: any) {
     return Response.json(
       { error: e?.message || "Failed to confirm order" },
