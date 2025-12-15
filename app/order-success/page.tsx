@@ -44,6 +44,12 @@ export default function OrderSuccessPage() {
         if (!res.ok) throw new Error(json?.error || "Failed to load order");
 
         setData(json);
+        await fetch("/api/orders/confirm", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ session_id: sessionId }),
+        });
+
       } catch (e: any) {
         setError(e?.message || "Failed to load order");
         toast.error(e?.message || "Failed to load order");
