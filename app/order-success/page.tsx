@@ -111,7 +111,7 @@ export default function OrderSuccessPage() {
               <div className="rounded-lg border bg-gray-50 p-4">
                 <p className="text-xs text-gray-500">Total paid</p>
                 <p className="text-xl font-extrabold text-gray-900">
-                  {money(data?.amount_total, data?.currency)}
+                  {money(data?.amount_total, data?.currency ?? null)}
                 </p>
               </div>
             </div>
