@@ -36,7 +36,7 @@ It demonstrates real-world shopping features such as authentication, product dis
 
 ### Clone the repository
 ```bash
-git clone https://github.com/<your-username>/zyvero.git
+git clone https://github.com/srimanpoloju/Zyvero-ecommerce-platform.git
 cd zyvero
 
 Install dependencies
