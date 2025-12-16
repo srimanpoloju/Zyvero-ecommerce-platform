@@ -52,7 +52,7 @@ export default function AuthModal({
   const [emailErr, setEmailErr] = useState<string | null>(null);
   const [passwordErr, setPasswordErr] = useState<string | null>(null);
 
-  // Loading (for nice UX; later replace with real backend calls)
+  // Loading
   const [loadingContinue, setLoadingContinue] = useState(false);
   const [loadingSubmit, setLoadingSubmit] = useState(false);
 
@@ -85,11 +85,25 @@ export default function AuthModal({
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") safeClose();
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  function safeClose() {
+    // cleanup so it never “sticks” open / blocks clicks
+    setLoadingContinue(false);
+    setLoadingSubmit(false);
+    setPassword("");
+    setShowPassword(false);
+    setPasswordErr(null);
+    setEmailErr(null);
+    setNameErr(null);
+    setStep("email");
+    onClose();
+  }
 
   // Validation helpers
   function validateEmailNow(value: string) {
@@ -114,7 +128,6 @@ export default function AuthModal({
     return null;
   }
 
-  // Button enabled states (Amazon-like UX)
   const canContinue =
     (mode === "signup" ? !validateNameNow(name) : true) && !validateEmailNow(email);
 
@@ -125,7 +138,6 @@ export default function AuthModal({
 
   async function continueToPassword(e: React.FormEvent) {
     e.preventDefault();
-
     if (loadingContinue) return;
 
     setNameErr(null);
@@ -142,10 +154,8 @@ export default function AuthModal({
       return;
     }
 
-    // Remember email for next time
     localStorage.setItem(LAST_EMAIL_KEY, email.trim());
 
-    // Small loading for smooth UX (replace with real API later)
     setLoadingContinue(true);
     setTimeout(() => {
       setLoadingContinue(false);
@@ -156,7 +166,6 @@ export default function AuthModal({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-
     if (loadingSubmit) return;
 
     setNameErr(null);
@@ -185,16 +194,13 @@ export default function AuthModal({
       return;
     }
 
-    // Remember email for next time
     localStorage.setItem(LAST_EMAIL_KEY, email.trim());
 
     setLoadingSubmit(true);
 
-    // Fake network delay (replace with backend later)
     setTimeout(() => {
       setLoadingSubmit(false);
 
-      // Remember me: persist vs session
       if (remember) {
         localStorage.setItem(USER_KEY, email.trim());
         sessionStorage.removeItem(USER_KEY);
@@ -208,293 +214,271 @@ export default function AuthModal({
       );
 
       onAuthed(email.trim());
-      onClose();
+      safeClose();
     }, 600);
   }
 
+  // ✅ CRITICAL: when closed, render nothing (no overlay to block clicks)
+  if (!open) return null;
+
   return (
     <AnimatePresence>
-      {open && (
+      <motion.div
+        className="fixed inset-0 z-50 flex items-center justify-center p-4"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        {/* Backdrop */}
+        <div
+          className="absolute inset-0 bg-black/60"
+          onClick={safeClose}
+        />
+
+        {/* Modal */}
         <motion.div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          initial={{ opacity: 0, y: 30, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 20, scale: 0.98 }}
+          transition={{ duration: 0.25 }}
+          className="relative w-full max-w-md rounded-xl bg-white shadow-xl"
         >
-          {/* Backdrop */}
-          <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-
-          {/* Modal */}
-          <motion.div
-            initial={{ opacity: 0, y: 30, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.98 }}
-            transition={{ duration: 0.25 }}
-            className="relative w-full max-w-md rounded-xl bg-white shadow-xl"
-          >
-            <div className="flex items-center justify-between border-b p-4">
-              <div className="font-bold text-lg">
-                {mode === "login" ? "Sign in" : "Create account"}{" "}
-                <span className="text-gray-500 font-normal">• Zyvero</span>
-              </div>
-
-              <button
-                onClick={onClose}
-                className="text-gray-600 hover:text-gray-900 text-xl leading-none"
-                aria-label="Close"
-              >
-                ×
-              </button>
+          <div className="flex items-center justify-between border-b p-4">
+            <div className="font-bold text-lg">
+              {mode === "login" ? "Sign in" : "Create account"}{" "}
+              <span className="text-gray-500 font-normal">• Zyvero</span>
             </div>
 
-            {/* Tabs */}
-            <div className="px-4 pt-4 flex gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("login");
-                  setStep("email");
-                  setPassword("");
-                  setShowPassword(false);
-                  setNameErr(null);
-                  setEmailErr(null);
-                  setPasswordErr(null);
-                }}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold ${
-                  mode === "login"
-                    ? "bg-gray-900 text-white border-gray-900"
-                    : "bg-white text-gray-800"
-                }`}
-              >
-                Sign In
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setMode("signup");
-                  setStep("email");
-                  setPassword("");
-                  setShowPassword(false);
-                  setNameErr(null);
-                  setEmailErr(null);
-                  setPasswordErr(null);
-                }}
-                className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold ${
-                  mode === "signup"
-                    ? "bg-gray-900 text-white border-gray-900"
-                    : "bg-white text-gray-800"
-                }`}
-              >
-                Sign Up
-              </button>
-            </div>
+            <button
+              onClick={safeClose}
+              className="text-gray-600 hover:text-gray-900 text-xl leading-none"
+              aria-label="Close"
+              type="button"
+            >
+              ×
+            </button>
+          </div>
 
-            <div className="p-4">
-              {/* STEP 1: Email (Amazon-like Continue) */}
-              {step === "email" && (
-                <form onSubmit={continueToPassword} className="space-y-3">
-                  {mode === "signup" && (
-                    <div>
-                      <label className="text-sm font-semibold text-gray-800">
-                        Full name
-                      </label>
-                      <input
-                        value={name}
-                        onChange={(e) => {
-                          setName(e.target.value);
-                          if (nameErr) setNameErr(null);
-                        }}
-                        onBlur={() => setNameErr(mode === "signup" ? validateNameNow(name) : null)}
-                        placeholder="John Doe"
-                        className="mt-1 w-full border rounded px-3 py-2"
-                      />
-                      {nameErr && (
-                        <p className="mt-1 text-xs text-red-600">{nameErr}</p>
-                      )}
-                    </div>
-                  )}
+          {/* Tabs */}
+          <div className="px-4 pt-4 flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setMode("login");
+                setStep("email");
+                setPassword("");
+                setShowPassword(false);
+                setNameErr(null);
+                setEmailErr(null);
+                setPasswordErr(null);
+              }}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold ${
+                mode === "login"
+                  ? "bg-gray-900 text-white border-gray-900"
+                  : "bg-white text-gray-800"
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("signup");
+                setStep("email");
+                setPassword("");
+                setShowPassword(false);
+                setNameErr(null);
+                setEmailErr(null);
+                setPasswordErr(null);
+              }}
+              className={`flex-1 rounded-lg border px-3 py-2 text-sm font-semibold ${
+                mode === "signup"
+                  ? "bg-gray-900 text-white border-gray-900"
+                  : "bg-white text-gray-800"
+              }`}
+            >
+              Sign Up
+            </button>
+          </div>
 
+          <div className="p-4">
+            {/* STEP 1: Email */}
+            {step === "email" && (
+              <form onSubmit={continueToPassword} className="space-y-3">
+                {mode === "signup" && (
                   <div>
                     <label className="text-sm font-semibold text-gray-800">
-                      Email
+                      Full name
                     </label>
                     <input
-                      value={email}
+                      value={name}
                       onChange={(e) => {
-                        setEmail(e.target.value);
-                        if (emailErr) setEmailErr(null);
+                        setName(e.target.value);
+                        if (nameErr) setNameErr(null);
                       }}
-                      onBlur={() => setEmailErr(validateEmailNow(email))}
-                      type="email"
-                      placeholder="you@example.com"
+                      onBlur={() =>
+                        setNameErr(mode === "signup" ? validateNameNow(name) : null)
+                      }
+                      placeholder="John Doe"
                       className="mt-1 w-full border rounded px-3 py-2"
                     />
-                    {emailErr && (
-                      <p className="mt-1 text-xs text-red-600">{emailErr}</p>
-                    )}
-                    <p className="mt-1 text-xs text-gray-500">
-                      We’ll ask for your password next.
-                    </p>
+                    {nameErr && <p className="mt-1 text-xs text-red-600">{nameErr}</p>}
                   </div>
+                )}
 
-                  <motion.button
-                    whileTap={{ scale: 0.98 }}
-                    disabled={!canContinue || loadingContinue}
-                    className={`w-full rounded px-4 py-2 font-semibold ${
-                      canContinue && !loadingContinue
-                        ? "bg-yellow-400 hover:bg-yellow-500"
-                        : "bg-yellow-200 cursor-not-allowed"
-                    }`}
+                <div>
+                  <label className="text-sm font-semibold text-gray-800">Email</label>
+                  <input
+                    value={email}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (emailErr) setEmailErr(null);
+                    }}
+                    onBlur={() => setEmailErr(validateEmailNow(email))}
+                    type="email"
+                    placeholder="you@example.com"
+                    className="mt-1 w-full border rounded px-3 py-2"
+                  />
+                  {emailErr && <p className="mt-1 text-xs text-red-600">{emailErr}</p>}
+                  <p className="mt-1 text-xs text-gray-500">
+                    We’ll ask for your password next.
+                  </p>
+                </div>
+
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
+                  disabled={!canContinue || loadingContinue}
+                  className={`w-full rounded px-4 py-2 font-semibold ${
+                    canContinue && !loadingContinue
+                      ? "bg-yellow-400 hover:bg-yellow-500"
+                      : "bg-yellow-200 cursor-not-allowed"
+                  }`}
+                >
+                  {loadingContinue ? "Loading..." : "Continue"}
+                </motion.button>
+
+                <div className="text-xs text-gray-500 text-center">
+                  By continuing, you agree to Zyvero’s Terms & Privacy Policy.
+                </div>
+              </form>
+            )}
+
+            {/* STEP 2: Password */}
+            {step === "password" && (
+              <form onSubmit={submit} className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-700">
+                    <span className="font-semibold">Email:</span> {email || "—"}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setStep("email");
+                      setPasswordErr(null);
+                    }}
+                    className="text-sm text-blue-700 hover:underline"
                   >
-                    {loadingContinue ? "Loading..." : "Continue"}
-                  </motion.button>
+                    Change
+                  </button>
+                </div>
 
-                  <div className="text-xs text-gray-500 text-center">
-                    By continuing, you agree to Zyvero’s Terms & Privacy Policy.
-                  </div>
-                </form>
-              )}
-
-              {/* STEP 2: Password */}
-              {step === "password" && (
-                <form onSubmit={submit} className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="text-sm text-gray-700">
-                      <span className="font-semibold">Email:</span>{" "}
-                      {email || "—"}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setStep("email");
-                        setPasswordErr(null);
-                      }}
-                      className="text-sm text-blue-700 hover:underline"
-                    >
-                      Change
-                    </button>
-                  </div>
-
-                  <div>
-                    <label className="text-sm font-semibold text-gray-800">
-                      Password
-                    </label>
-
-                    <div className="mt-1 flex items-center gap-2">
-                      <input
-                        value={password}
-                        onChange={(e) => {
-                          setPassword(e.target.value);
-                          if (passwordErr) setPasswordErr(null);
-                        }}
-                        onBlur={() => setPasswordErr(validatePasswordNow(password))}
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Enter password"
-                        className="w-full border rounded px-3 py-2"
-                      />
-
-                      <button
-                        type="button"
-                        onClick={() => setShowPassword((s) => !s)}
-                        className="border rounded px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                        aria-label="Toggle password visibility"
-                      >
-                        {showPassword ? "Hide" : "Show"}
-                      </button>
-                    </div>
-
-                    {passwordErr && (
-                      <p className="mt-1 text-xs text-red-600">{passwordErr}</p>
-                    )}
-                  </div>
-
-                  <div className="text-right">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        toast("Password reset will be enabled once backend is added 🔐")
-                      }
-                      className="text-sm text-blue-700 hover:underline"
-                    >
-                      Forgot password?
-                    </button>
-                  </div>
-
-                  {/* Password rules only for signup */}
-                  {mode === "signup" && (
-                    <div className="rounded-lg border bg-gray-50 p-3">
-                      <div className="text-sm font-semibold text-gray-800 mb-2">
-                        Password must include:
-                      </div>
-                      <ul className="text-sm space-y-1">
-                        <li
-                          className={
-                            pwCheck.rules.min8 ? "text-green-700" : "text-gray-700"
-                          }
-                        >
-                          • At least 8 characters
-                        </li>
-                        <li
-                          className={
-                            pwCheck.rules.upper ? "text-green-700" : "text-gray-700"
-                          }
-                        >
-                          • 1 uppercase letter (A-Z)
-                        </li>
-                        <li
-                          className={
-                            pwCheck.rules.number ? "text-green-700" : "text-gray-700"
-                          }
-                        >
-                          • 1 number (0-9)
-                        </li>
-                        <li
-                          className={
-                            pwCheck.rules.special ? "text-green-700" : "text-gray-700"
-                          }
-                        >
-                          • 1 special character (!@#…)
-                        </li>
-                      </ul>
-                    </div>
-                  )}
-
-                  <label className="flex items-center gap-2 text-sm text-gray-800">
+                <div>
+                  <label className="text-sm font-semibold text-gray-800">Password</label>
+                  <div className="mt-1 flex items-center gap-2">
                     <input
-                      type="checkbox"
-                      checked={remember}
-                      onChange={(e) => setRemember(e.target.checked)}
+                      value={password}
+                      onChange={(e) => {
+                        setPassword(e.target.value);
+                        if (passwordErr) setPasswordErr(null);
+                      }}
+                      onBlur={() => setPasswordErr(validatePasswordNow(password))}
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Enter password"
+                      className="w-full border rounded px-3 py-2"
                     />
-                    Remember me
-                  </label>
 
-                  <motion.button
-                    whileTap={{ scale: 0.98 }}
-                    disabled={!canSubmit || loadingSubmit}
-                    className={`w-full rounded px-4 py-2 font-semibold ${
-                      canSubmit && !loadingSubmit
-                        ? "bg-yellow-400 hover:bg-yellow-500"
-                        : "bg-yellow-200 cursor-not-allowed"
-                    }`}
-                  >
-                    {loadingSubmit
-                      ? mode === "login"
-                        ? "Signing in..."
-                        : "Creating account..."
-                      : mode === "login"
-                      ? "Sign In"
-                      : "Create account"}
-                  </motion.button>
-
-                  <div className="text-xs text-gray-500 text-center">
-                    Tip: Uncheck “Remember me” on shared computers.
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((s) => !s)}
+                      className="border rounded px-3 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                      aria-label="Toggle password visibility"
+                    >
+                      {showPassword ? "Hide" : "Show"}
+                    </button>
                   </div>
-                </form>
-              )}
-            </div>
-          </motion.div>
+
+                  {passwordErr && (
+                    <p className="mt-1 text-xs text-red-600">{passwordErr}</p>
+                  )}
+                </div>
+
+                <div className="text-right">
+                  <button
+                    type="button"
+                    onClick={() => toast("Password reset will be enabled once backend is added 🔐")}
+                    className="text-sm text-blue-700 hover:underline"
+                  >
+                    Forgot password?
+                  </button>
+                </div>
+
+                {mode === "signup" && (
+                  <div className="rounded-lg border bg-gray-50 p-3">
+                    <div className="text-sm font-semibold text-gray-800 mb-2">
+                      Password must include:
+                    </div>
+                    <ul className="text-sm space-y-1">
+                      <li className={pwCheck.rules.min8 ? "text-green-700" : "text-gray-700"}>
+                        • At least 8 characters
+                      </li>
+                      <li className={pwCheck.rules.upper ? "text-green-700" : "text-gray-700"}>
+                        • 1 uppercase letter (A-Z)
+                      </li>
+                      <li className={pwCheck.rules.number ? "text-green-700" : "text-gray-700"}>
+                        • 1 number (0-9)
+                      </li>
+                      <li className={pwCheck.rules.special ? "text-green-700" : "text-gray-700"}>
+                        • 1 special character (!@#…)
+                      </li>
+                    </ul>
+                  </div>
+                )}
+
+                <label className="flex items-center gap-2 text-sm text-gray-800">
+                  <input
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
+                  />
+                  Remember me
+                </label>
+
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
+                  disabled={!canSubmit || loadingSubmit}
+                  className={`w-full rounded px-4 py-2 font-semibold ${
+                    canSubmit && !loadingSubmit
+                      ? "bg-yellow-400 hover:bg-yellow-500"
+                      : "bg-yellow-200 cursor-not-allowed"
+                  }`}
+                >
+                  {loadingSubmit
+                    ? mode === "login"
+                      ? "Signing in..."
+                      : "Creating account..."
+                    : mode === "login"
+                    ? "Sign In"
+                    : "Create account"}
+                </motion.button>
+
+                <div className="text-xs text-gray-500 text-center">
+                  Tip: Uncheck “Remember me” on shared computers.
+                </div>
+              </form>
+            )}
+          </div>
         </motion.div>
-      )}
+      </motion.div>
     </AnimatePresence>
   );
 }

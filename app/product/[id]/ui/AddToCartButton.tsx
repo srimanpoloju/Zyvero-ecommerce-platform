@@ -2,6 +2,7 @@
 
 import toast from "react-hot-toast";
 import { useCart } from "../../../store/cart";
+import { motion } from "framer-motion";
 
 type Product = {
   id: number;
@@ -13,35 +14,29 @@ type Product = {
 export default function AddToCartButton({ product }: { product: Product }) {
   const addItem = useCart((s) => s.addItem);
 
-  function handleAddToCart() {
-    // 🔐 Check login (supports multiple auth keys)
+  function handleAdd() {
     const user =
       localStorage.getItem("zyvero_user") ||
-      localStorage.getItem("user") ||
-      localStorage.getItem("email") ||
-      sessionStorage.getItem("zyvero_user") ||
-      sessionStorage.getItem("user") ||
-      sessionStorage.getItem("email");
+      sessionStorage.getItem("zyvero_user");
 
     if (!user) {
       toast.error("Please sign in to add items to cart");
       return;
     }
 
-    // 🛒 Add item
     addItem(product);
-
-    // 🔔 Success toast
     toast.success("Added to cart");
   }
 
   return (
-    <button
+    <motion.button
       type="button"
-      onClick={handleAddToCart}
-      className="w-full md:w-auto bg-yellow-400 hover:bg-yellow-500 rounded px-6 py-3 font-semibold transition relative z-50"
+      whileTap={{ scale: 0.97 }}
+      whileHover={{ scale: 1.02 }}
+      onClick={handleAdd}
+      className="w-full md:w-auto bg-yellow-400 hover:bg-yellow-500 rounded px-6 py-3 font-semibold"
     >
       Add to cart
-    </button>
+    </motion.button>
   );
 }
