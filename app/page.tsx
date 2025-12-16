@@ -3,9 +3,9 @@ import ProductGridClient from "./components/ProductGridClient";
 import RecentlyViewedRow from "./components/RecentlyViewedRow";
 import ProductCard from "./components/ProductCard";
 import HeroCarousel from "./components/HeroCarousel";
-import SectionReveal from "./components/SectionReveal";
 import HorizontalProductRow from "./components/HorizontalProductRow";
 import Reveal from "./components/Reveal";
+import TrustCards from "./components/TrustCards";
 
 type Product = {
   id: number;
@@ -90,6 +90,13 @@ export default async function HomePage() {
       <Reveal>
         <HeroCarousel slides={slides} />
       </Reveal>
+
+      {/* ✅ TRUST CARDS (Clickable modals) */}
+      <div className="mx-auto max-w-6xl px-4 -mt-6 relative z-10">
+        <Reveal delay={0.02}>
+          <TrustCards />
+        </Reveal>
+      </div>
 
       <div className="mx-auto max-w-6xl px-4">
         {/* CATEGORIES */}
@@ -197,7 +204,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* CTA FOOTER */}
+      {/* CTA */}
       <section className="mx-auto max-w-6xl px-4 py-12">
         <Reveal>
           <div className="rounded-2xl bg-gray-900 p-8 text-white">
